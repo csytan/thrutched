@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+    <title>Thrutched | Submit a Video</title>
+{% end %}
+
+
+{% block style %}
+    <style>
+        #url, #title { width: 350px; }
+        #text {
+            width: 450px;
+            height: 150px;
+        }
+    </style>
+{% end %}
+
+
+{% block script %}
+    <script>
+        $(function(){
+            var youtube_re = /youtube\.com\/watch\?\S*v=([^&\s]+)/;
+            var vimeo_re = /vimeo\.com\/(\d+)/;
+            
+            $('#url').blur(function(){
+                var youtube = youtube_re.exec(this.value);
+                var vimeo = vimeo_re.exec(this.value);
+                if (youtube) youtube_data(youtube[1]);
+                if (vimeo) vimeo_data(vimeo[1]);
+            });
+            
+            
+            function youtube_data(id){
+                var url = 'http://gdata.youtube.com/feeds/api/videos/' + id + '?v=2&alt=jsonc&callback=?';
+                $.getJSON(url, function(data){
+                    var title = data.data.title;
+                    var text = data.data.description;
+                    $('#title').val(title);
+                    $('#text').val(text);
+                });
+            }
+            
+            function vimeo_data(id){
+                var url = 'http://vimeo.com/api/v2/video/' + id + '.json?callback=?';
+                $.getJSON(url, function(data){
+                    data = data[0];
+                    var title = data.title;
+                    var text = data.description;
+                    $('#title').val(title);
+                    $('#text').val(text);
+                });
+            }
+            
+        });
+    </script>
+{% end %}
+
+
+{% block content %}
+    {% set message = handler.get_argument('message', None) %}
+    {% if message == 'no_title' %}
+        <div id="message" class="error">Missing a title</div>
+    {% elif message == 'check_slug' %}
+        <div id="message" class="error">Please check that the topic URL is correct.</div>
+    {% end %}
+    
+    <h1>Submit a Video</h1>
+    
+    <form action="/submit" method="post">
+        {{ xsrf_form_html() }}
+        <label for="url">Url (YouTube or Vimeo)</label>
+        <input id="url" type="text" name="url" tabindex="1">
+        <label for="title">Title</label>
+        <input id="title" type="text" name="title" tabindex="2">
+        <label for="text">Text</label>
+        <textarea id="text" name="text" tabindex="3"></textarea>
+        <br>
+        <input type="submit" value="Do it!" tabindex="4">
+    </form>
+{% end %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+
+{% block style %}
+    <style>
+        html {
+        }
+        body {
+        }
+        a.vid {
+            text-decoration: none;
+        }
+        a.vid h2 {
+            position: absolute;
+            top: 100px;
+            left: 15px;
+            max-width: 80%;
+            font-size: 1.1em;
+            font-weight: normal;
+            letter-spacing: 1px;
+            line-height: 1.4em;
+            background: #292929;
+            opacity: 0.8;
+            padding: 0.1em 0.4em;
+        }
+        .vid {
+            overflow: hidden;
+            position: relative;
+            width: 300px;
+            height: 200px;
+            float: left;
+            margin-right: 20px;
+            margin-bottom: 20px;
+            padding: 0;
+        }
+        .vid img {
+            position: absolute;
+            top: -100px;
+            left: -80px;
+            display: block;
+        }
+        .vid:hover {
+            opacity: 0.9;
+        }
+        #next_page {
+            font-size: 1.1em;
+        }
+    </style>
+{% end %}
+
+
+{% block script %}
+    <script>
+
+    </script>
+{% end %}
+
+
+{% block content %}
+    {% for vid in videos %}
+        <a class="vid" href="/{{ vid.key().id() }}">
+            <img src="{{ vid.thumbnail }}">
+            <h2>{{ vid.title }}</h2>
+            <div style="clear:left"></div>
+        </a>
+    {% end %}
+    <div style="clear:both"></div>
+    
+    {% if next_page %}
+        <div class="inner">
+            <a id="next_page" href="/?page={{ next_page }}">more »</a>
+        </div>
+    {% end %}
+{% end %}
