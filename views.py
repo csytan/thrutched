@@ -101,8 +101,8 @@ class Index(BaseHandler):
     def get(self):
         page = self.get_argument('page', '')
         page = abs(int(page)) if page.isdigit() else 0
-        videos = models.Video.all().order('-score').fetch(12, offset=page*12)
-        next_page = page + 1 if len(videos) == 12 else None
+        videos = models.Video.all().order('-score').fetch(9, offset=page*9)
+        next_page = page + 1 if len(videos) == 9 else None
         self.render('index.html', videos=videos, next_page=next_page)
 
 
