@@ -75,11 +75,12 @@ textarea {
 }
 #logo {
     float: left;
-    font-size: 2em;
+    font-size: 2.5em;
     text-decoration: none;
 }
 #nav {
     float: right;
+    padding-top: 10px;
 }
 #nav a {
     color: #959595;
@@ -94,6 +95,38 @@ textarea {
 #nav a:hover,
 #nav a:active {
     color: #464646;
+}
+
+
+
+a.vid_thumb {
+    text-decoration: none;
+    overflow: hidden;
+    position: relative;
+    width: 300px;
+    height: 200px;
+}
+a.vid_thumb .title {
+    position: absolute;
+    top: 110px;
+    left: 15px;
+    max-width: 80%;
+    font-size: 1.1em;
+    font-weight: normal;
+    letter-spacing: 1px;
+    line-height: 1.4em;
+    background: #292929;
+    opacity: 0.8;
+    padding: 0.1em 0.4em;
+}
+.vid_thumb img {
+    position: absolute;
+    top: -100px;
+    left: -80px;
+    display: block;
+}
+.vid_thumb:hover {
+    opacity: 0.9;
 }
 
 

@@ -9,6 +9,7 @@ import urlparse
 from google.appengine.ext import db
 
 import tornado.web
+from django.utils import simplejson as json
 
 import models
 
@@ -140,27 +141,36 @@ class Video(BaseHandler):
         video = models.Video.get_by_id(int(id))
         if not video:
             raise tornado.web.HTTPError(404)
-        self.render('video.html', video=video, replies=video.replies())
+        next_vid = models.Video.all().filter('score <', video.score).order('-score').get()
+        self.render('video.html', video=video, next_vid=next_vid, replies=video.replies())
         
     def render_comments(self, comments):
         return self.render_string('_comment.html', comments=comments)
         
     def post(self, id):
-        video = models.Video.get_by_id(id)
+        video = models.Video.get_by_id(int(id))
         if not video:
             raise tornado.web.HTTPError(404)
         
-        reply_to = self.get_argument('reply_to', None)
-        if reply_to:
-            reply_to = models.Comment.get_by_id(int(reply_to))
-        comment = models.Comment(
-            author=self.get_argument('author'),
-            video=video,
-            reply_to=reply_to,
-            text=self.get_argument('text'))
-        comment.update_score()
-        
-        video.n_comments += 1
-        db.put([topic, comment])
-        
+        action = self.get_argument('action')
+        if action == 'like':
+            response = urllib.urlopen(
+                'http://graph.facebook.com/?' + \
+                urllib.urlencode({'ids': self.request.full_url()})).read()
+            data = json.loads(response)
+            site = data.values()[0]
+            video.points = site.get('shares', 0)
+            video.update_score()
+            video.put()
+        elif action == 'comment':
+            reply_to = self.get_argument('reply_to', None)
+            if reply_to:
+                reply_to = models.Comment.get_by_id(int(reply_to))
+            comment = models.Comment(
+                author=self.get_argument('author'),
+                video=video,
+                reply_to=reply_to,
+                text=self.get_argument('text'))
+            comment.update_score()
+            comment.put()
         self.redirect(self.request.path + '#c' + str(comment.id))

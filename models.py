@@ -26,7 +26,6 @@ def prefetch_refprop(entities, prop):
 ### Models ###
 class Votable(db.Model):
     created = db.DateTimeProperty(auto_now_add=True)
-    updated = db.DateTimeProperty(auto_now=True)
     points = db.IntegerProperty(default=1)
     score = db.FloatProperty()
     ip_likes = db.StringListProperty()
@@ -51,7 +50,6 @@ class Video(Votable):
     vimeo = db.StringProperty()
     thumbnail = db.StringProperty(indexed=False)
     text = db.TextProperty(default='')
-    n_comments = db.IntegerProperty(default=0)
     
     def set_thumbnail(self):
         if self.youtube:
