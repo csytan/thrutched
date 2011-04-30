@@ -81,14 +81,16 @@ class Video(Votable):
             if parent:
                 parent.replies.append(comment)
         replies = [c for c in comments if not c.reply_to]
-        prefetch_refprop(replies, Comment.author)
         return replies
 
 
 class Comment(Votable):
     author = db.StringProperty()
+    author_ip = db.StringProperty()
     video = db.ReferenceProperty(Video, collection_name='comments')
     text = db.TextProperty()
     reply_to = db.SelfReferenceProperty(collection_name='reply_to_set')
 
-
+    @property
+    def id(self):
+        return self.key().id()

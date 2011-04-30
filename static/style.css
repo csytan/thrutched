@@ -121,7 +121,7 @@ a.vid_thumb .title {
 }
 .vid_thumb img {
     position: absolute;
-    top: -100px;
+    top: -60px;
     left: -80px;
     display: block;
 }

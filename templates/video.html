@@ -41,6 +41,7 @@
 
 
 {% block style %}
+    <link rel="image_src" href="{{ video.thumbnail }}">
     <style>
         h1.title {
             margin-top: 1em;
@@ -63,19 +64,17 @@
             width: 600px;
             text-align: justify;
         }
-        #reply_box { display: none; }
-        #reply_box .body { width: 75%; }
-        #reply_box textarea {
-            width: 100%;
-            height: 100px;
-        }
+        
+        #reply_box #author,
+        #reply_box #text { width: 300px; }
+        #reply_box #text { height: 100px; }
     </style>
 {% end %}
 
 
 {% block content %}
     {% if video.youtube %}
-        <iframe src="http://www.youtube.com/embed/{{ video.youtube }}?hd=1" class="video" frameborder="0"></iframe>
+        <iframe src="http://www.youtube.com/embed/{{ video.youtube }}?autohide=1&amp;hd=1" class="video" frameborder="0"></iframe>
     {% elif video.vimeo %}
         <iframe src="http://player.vimeo.com/video/{{ video.vimeo }}" class="video" frameborder="0"></iframe>
     {% end %}
@@ -88,16 +87,22 @@
     {% end %}
 
     <h1 class="title">{{ escape(video.title) }}</h1>
-    
-
+    <fb:like href="" send="false" width="450" show_faces="false" font=""></fb:like>
     
     <p class="description">{{ escape(video.text) }}</p>
-    <fb:like href="" send="false" width="450" show_faces="false" font=""></fb:like>
     <div style="clear:both"></div>
     
-    
-    <h2>Comments</h2>
-    
+    <h2 style="margin-top:2em">Comments</h2>
+    <form id="reply_box" action="" method="post">
+        {{ xsrf_form_html() }}
+        <input type="hidden" name="action" value="comment">
+        <label for="author">Author</label>
+        <input id="author" type="text" name="author" tabindex="1">
+        <label for="text">Text</label>
+        <textarea id="text" name="text" tabindex="2"></textarea>
+        <br>
+        <input type="submit" value="Do it!" tabindex="3">
+    </form>
     {{ handler.render_comments(replies) }}
 {% end %}
 

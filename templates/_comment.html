@@ -1,42 +1,20 @@
 {% for comment in comments %}
     <div class="comment" id="c{{ comment.id }}">
-        {% if comment.author %}
-            <img src="{{ comment.author.gravatar(60) }}" class="gravatar">
-        {% else %}
-            <img src="http://www.gravatar.com/avatar/0?d=mm&amp;s=60" class="gravatar">
-        {% end %}
-        
-        <div class="body">
-            <p class="info">
-                {% if not current_user %}
-                    <a class="vote_up sign_in" href="/sign_in?message=vote">+</a>
-                {% elif comment.can_vote_up(current_user) %}
-                    <a class="vote_up" href="/vote?way=up&amp;comment_id={{ comment.id }}">+</a>
-                {% end %}
-                {% if comment.can_vote_down(current_user) %}
-                    / <a class="vote_down" href="/vote?way=down&amp;comment_id={{ comment.id }}">-</a>
-                {% end %}
-                
-                <span class="points">
-                    {{ comment.points }} {{ 'point' if comment.points in (1, -1) else 'points' }}
-                </span>
-                
-                {% if comment.author %}
-                    by <a href="/users/{{ comment.author.name }}">{{ comment.author.name }}</a>
-                {% else %}
-                    by anonymous
-                {% end %}
-                
-                {{ relative_date(comment.created) }}
-                |
-                <a href="#c{{ comment.id }}">link</a>
-                {% if comment.can_edit(current_user) %}
-                    | <a href="/comments/{{ comment.id }}/edit">edit</a>
-                {% end %}
-            </p>
-            {{ markdown(comment.text) }}
-            <a data-id="{{ comment.id }}" class="reply">reply</a>
-        </div>
+        <p class="info">
+            <a class="vote_up sign_in" href="">+</a>
+            <a class="vote_down" href="">-</a>
+            <span class="points">
+                {{ comment.points }} {{ 'point' if comment.points in (1, -1) else 'points' }}
+            </span>
+            
+            by {{ comment.author }}
+            
+            {{ relative_date(comment.created) }}
+            |
+            <a href="#c{{ comment.id }}">link</a>
+        </p>
+        {{ escape(comment.text) }}
+        <a data-id="{{ comment.id }}" class="reply">reply</a>
         {{ handler.render_comments(comment.replies) }}
     </div>
 {% end %}

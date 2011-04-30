@@ -23,35 +23,30 @@
             var youtube_re = /youtube\.com\/watch\?\S*v=([^&\s]+)/;
             var vimeo_re = /vimeo\.com\/(\d+)/;
             
-            $('#url').blur(function(){
-                var youtube = youtube_re.exec(this.value);
-                var vimeo = vimeo_re.exec(this.value);
-                if (youtube) youtube_data(youtube[1]);
-                if (vimeo) vimeo_data(vimeo[1]);
-            });
+            $('#url').focus()
+                .bind('paste blur keyup', function(){
+                    var youtube = youtube_re.exec(this.value);
+                    var vimeo = vimeo_re.exec(this.value);
             
-            
-            function youtube_data(id){
-                var url = 'http://gdata.youtube.com/feeds/api/videos/' + id + '?v=2&alt=jsonc&callback=?';
-                $.getJSON(url, function(data){
-                    var title = data.data.title;
-                    var text = data.data.description;
-                    $('#title').val(title);
-                    $('#text').val(text);
+                    if (youtube){
+                        var url = 'http://gdata.youtube.com/feeds/api/videos/' + youtube[1] + '?v=2&alt=jsonc&callback=?';
+                        $.getJSON(url, function(data){
+                            var title = data.data.title;
+                            var text = data.data.description;
+                            $('#title').val(title);
+                            $('#text').val(text);
+                        });
+                    } else if (vimeo){
+                        var url = 'http://vimeo.com/api/v2/video/' + vimeo[1] + '.json?callback=?';
+                        $.getJSON(url, function(data){
+                            data = data[0];
+                            var title = data.title;
+                            var text = data.description;
+                            $('#title').val(title);
+                            $('#text').val(text);
+                        });
+                    }
                 });
-            }
-            
-            function vimeo_data(id){
-                var url = 'http://vimeo.com/api/v2/video/' + id + '.json?callback=?';
-                $.getJSON(url, function(data){
-                    data = data[0];
-                    var title = data.title;
-                    var text = data.description;
-                    $('#title').val(title);
-                    $('#text').val(text);
-                });
-            }
-            
         });
     </script>
 {% end %}

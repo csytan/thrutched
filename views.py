@@ -168,9 +168,10 @@ class Video(BaseHandler):
                 reply_to = models.Comment.get_by_id(int(reply_to))
             comment = models.Comment(
                 author=self.get_argument('author'),
+                author_ip=self.request.remote_ip,
                 video=video,
                 reply_to=reply_to,
                 text=self.get_argument('text'))
             comment.update_score()
             comment.put()
-        self.redirect(self.request.path + '#c' + str(comment.id))
+        self.redirect(self.request.path + '#c' + str(comment.key().id()))
