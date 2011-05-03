@@ -2,15 +2,19 @@
 <rss version="2.0">
 
 <channel>
-    <title>{{ escape(current_site.title) }}</title>
-    <link>{{ current_site.link }}</link>
-    <description>{{ escape(current_site.tagline)}}</description>
-    {% for topic in topics %}
+    <title>thrutched | climbing vids that make your palms sweat</title>
+    <link>http://www.thrutched.com/</link>
+    <description>climbing vids that make your palms sweat</description>
+    {% for vid in videos %}
         <item>
-            <title>{{ escape(topic.title) }}</title>
-            <link>{{ current_site.link }}/{{ topic.name }}</link>
-            <guid>{{ current_site.link }}/{{ topic.name }}</guid>
-            <description>{{ escape(markdown(topic.text, video_embed=True)) }}</description>
+            <title>{{ escape(vid.title) }}</title>
+            <link>http://www.thrutched.com/{{ vid.key().id() }}</link>
+            <guid>http://www.thrutched.com/{{ vid.key().id() }}</guid>
+            <description>
+                
+                {{ escape(markdown(topic.text, video_embed=True)) }}
+                
+            </description>
         </item>
     {% end %}
 </channel>
