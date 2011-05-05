@@ -23,9 +23,6 @@ class BaseHandler(tornado.web.RequestHandler):
         self.get(*args, **kwargs)
         self.request.body = ''
     
-    def get_current_user(self):
-        return self.get_secure_cookie('username')
-        
     def render_string(self, template_name, **kwargs):
         return super(BaseHandler, self).render_string(
             template_name,
@@ -107,12 +104,6 @@ class Index(BaseHandler):
         self.render('index.html', videos=videos, next_page=next_page)
 
 
-class RSS(BaseHandler):
-    def get(self):
-        raise tornado.web.HTTPError(404)
-        self.render('rss.xml')
-
-
 class Submit(BaseHandler):
     def get(self):
         self.render('submit.html')
@@ -143,10 +134,7 @@ class Video(BaseHandler):
         if not video:
             raise tornado.web.HTTPError(404)
         next_vid = models.Video.all().filter('score <', video.score).order('-score').get()
-        self.render('video.html', video=video, next_vid=next_vid, replies=video.replies())
-        
-    def render_comments(self, comments):
-        return self.render_string('_comment.html', comments=comments)
+        self.render('video.html', video=video, next_vid=next_vid)
         
     def post(self, id):
         video = models.Video.get_by_id(int(id))
@@ -163,16 +151,6 @@ class Video(BaseHandler):
             video.points = site.get('shares', 0)
             video.update_score()
             video.put()
-        elif action == 'comment':
-            reply_to = self.get_argument('reply_to', None)
-            if reply_to:
-                reply_to = models.Comment.get_by_id(int(reply_to))
-            comment = models.Comment(
-                author=self.get_argument('author'),
-                author_ip=self.request.remote_ip,
-                video=video,
-                reply_to=reply_to,
-                text=self.get_argument('text'))
-            comment.update_score()
-            comment.put()
-        self.redirect(self.request.path + '#c' + str(comment.key().id()))
+        self.write('1')
+        
+        

@@ -67,30 +67,5 @@ class Video(Votable):
             data = json.loads(response)
             if not data: return
             self.thumbnail = data[0]['thumbnail_large']
-        
-    def replies(self):
-        """Fetches the topic's comments & sets each comment's 'replies' attribute"""
-        keys = {}
-        comments = self.comments.order('-score').fetch(1000)
-        for comment in comments:
-            keys[str(comment.key())] = comment
-            comment.replies = []
-        for comment in comments:
-            parent_key = Comment.reply_to.get_value_for_datastore(comment)
-            parent = keys.get(str(parent_key))
-            if parent:
-                parent.replies.append(comment)
-        replies = [c for c in comments if not c.reply_to]
-        return replies
 
 
-class Comment(Votable):
-    author = db.StringProperty()
-    author_ip = db.StringProperty()
-    video = db.ReferenceProperty(Video, collection_name='comments')
-    text = db.TextProperty()
-    reply_to = db.SelfReferenceProperty(collection_name='reply_to_set')
-
-    @property
-    def id(self):
-        return self.key().id()

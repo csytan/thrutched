@@ -25,16 +25,6 @@
                 });
                 return false;
             });
-            
-            $('a.reply').live('click', function(){
-                $('#reply_to').val($(this).data('id'));
-                $('#reply_box')
-                    .insertAfter($(this).closest('.body'))
-                    .toggle('fast')
-                    .find('textarea')
-                    .focus();
-                return false;
-            });
         });
     </script>
 {% end %}
@@ -85,7 +75,7 @@
             <span class="title">Next...<br> {{ next_vid.title }}</span>
         </a>
     {% end %}
-
+    
     <h1 class="title">{{ escape(video.title) }}</h1>
     <fb:like href="" send="false" width="450" show_faces="false" font=""></fb:like>
     
@@ -93,15 +83,7 @@
     <div style="clear:both"></div>
     
     <h2 style="margin-top:2em">Comments</h2>
-    <form id="reply_box" action="" method="post">
-        {{ xsrf_form_html() }}
-        <input type="hidden" name="action" value="comment">
-        <label for="author">Author</label>
-        <input id="author" type="text" name="author" tabindex="1">
-        <label for="text">Text</label>
-        <textarea id="text" name="text" tabindex="2"></textarea>
-        <input type="submit" value="Post" tabindex="3">
-    </form>
-    {{ handler.render_comments(replies) }}
+    <div id="fb-root"></div>
+    <fb:comments href="http://www.thrutched.com/{{ video.key().id() }}" num_posts="10" width="500"></fb:comments>
 {% end %}
 

@@ -15,7 +15,6 @@ settings = {
 }
 application = tornado.wsgi.WSGIApplication([
     (r'/', views.Index),
-    (r'/rss\.xml', views.RSS),
     (r'/submit', views.Submit),
     (r'/(\d+)', views.Video)
 ], **settings)
