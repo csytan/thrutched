@@ -141,6 +141,14 @@ class Submit(BaseHandler):
         else:
             return self.reload(message='not_found', copyargs=True)
         
+        
+        if youtube:
+            dupe = models.Video.all().filter('youtube =', youtube).get()
+        elif vimeo:
+            dupe = models.Video.all().filter('vimeo =', vimeo).get()
+        if dupe:
+            return self.reload(message='dupe', dupe=dupe.key().id(), copyargs=True)
+        
         video = models.Video(
             youtube=youtube,
             vimeo=vimeo,

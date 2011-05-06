@@ -62,6 +62,8 @@
         <div id="message" class="error">Please enter a description!</div>
     {% elif message == 'not_found' %}
         <div id="message" class="error">Hey, we couldn't find the video. Please check that it's correct or try again later!</div>
+    {% elif message == 'dupe' %}
+        <div id="message" class="error">Sorry, this <a target="_blank" href="/{{ handler.get_argument('dupe', '') }}">video</a> has already been submitted!</div>
     {% end %}
     
     <h1>Submit a Video</h1>
