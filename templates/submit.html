@@ -54,10 +54,14 @@
 
 {% block content %}
     {% set message = handler.get_argument('message', None) %}
-    {% if message == 'no_title' %}
-        <div id="message" class="error">Missing a title</div>
-    {% elif message == 'check_slug' %}
-        <div id="message" class="error">Please check that the topic URL is correct.</div>
+    {% if message == 'missing_url' %}
+        <div id="message" class="error">Please enter a URL!</div>
+    {% elif message == 'missing_title' %}
+        <div id="message" class="error">Please enter a title!</div>
+    {% elif message == 'missing_text' %}
+        <div id="message" class="error">Please enter a description!</div>
+    {% elif message == 'not_found' %}
+        <div id="message" class="error">Hey, we couldn't find the video. Please check that it's correct or try again later!</div>
     {% end %}
     
     <h1>Submit a Video</h1>
@@ -65,11 +69,11 @@
     <form action="/submit" method="post">
         {{ xsrf_form_html() }}
         <label for="url">Url (YouTube or Vimeo)</label>
-        <input id="url" type="text" name="url" tabindex="1">
+        <input id="url" type="text" name="url" value="{{ handler.get_argument('url', '') }}" tabindex="1">
         <label for="title">Title</label>
-        <input id="title" type="text" name="title" tabindex="2">
+        <input id="title" type="text" name="title" value="{{ handler.get_argument('title', '') }}" tabindex="2">
         <label for="text">Text</label>
-        <textarea id="text" name="text" tabindex="3"></textarea>
+        <textarea id="text" name="text" tabindex="3">{{ handler.get_argument('text', '') }}</textarea>
         <input type="submit" value="Do it!" tabindex="4">
     </form>
 {% end %}

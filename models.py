@@ -50,22 +50,5 @@ class Video(Votable):
     vimeo = db.StringProperty()
     thumbnail = db.StringProperty(indexed=False)
     text = db.TextProperty(default='')
-    
-    def set_thumbnail(self):
-        if self.youtube:
-            api = 'http://gdata.youtube.com/feeds/api/videos/' + self.youtube + '?v=2&alt=json'
-            response = urllib.urlopen(api).read()
-            logging.error(response)
-            try:
-                data = json.loads(response)
-            except ValueError:
-                return
-            self.thumbnail = data['entry']['media$group']['media$thumbnail'][1]['url']
-        elif self.vimeo:
-            api = 'http://vimeo.com/api/v2/video/' + self.vimeo + '.json'
-            response = urllib.urlopen(api).read()
-            data = json.loads(response)
-            if not data: return
-            self.thumbnail = data[0]['thumbnail_large']
 
 

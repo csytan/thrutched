@@ -110,19 +110,43 @@ class Submit(BaseHandler):
         
     def post(self):
         url = self.get_argument('url', '')
+        title = self.get_argument('title', '')
+        text = self.get_argument('text', '')
+        if not url:
+            return self.reload(message='missing_url', copyargs=True)
+        elif not title:
+            return self.reload(message='missing_title', copyargs=True)
+        elif not text:
+            return self.reload(message='missing_text', copyargs=True)
+        
         youtube = re.findall(r'youtube\.com\/watch\?\S*v=([^&\s]+)', url)
         vimeo = re.findall(r'vimeo\.com\/(\d+)', url)
+        youtube = youtube[0] if youtube else None
+        vimeo = vimeo[0] if vimeo else None
+        if youtube:
+            api = 'http://gdata.youtube.com/feeds/api/videos/' + youtube + '?v=2&alt=json'
+            response = urllib.urlopen(api).read()
+            try:
+                data = json.loads(response)
+            except ValueError:
+                return self.reload(message='not_found', copyargs=True)
+            thumbnail = data['entry']['media$group']['media$thumbnail'][1]['url']
+        elif vimeo:
+            api = 'http://vimeo.com/api/v2/video/' + vimeo + '.json'
+            response = urllib.urlopen(api).read()
+            data = json.loads(response)
+            if not data:
+                return self.reload(message='not_found', copyargs=True)
+            thumbnail = data[0]['thumbnail_large']
+        else:
+            return self.reload(message='not_found', copyargs=True)
         
-        if not youtube and not vimeo:
-            return self.reload(message='', copyargs=True)
-            
         video = models.Video(
-            youtube=youtube[0] if youtube else None,
-            vimeo=vimeo[0] if vimeo else None,
-            title=self.get_argument('title', ''),
-            text=self.get_argument('text', '')
-        )
-        video.set_thumbnail()
+            youtube=youtube,
+            vimeo=vimeo,
+            title=title,
+            text=text,
+            thumbnail=thumbnail)
         video.update_score()
         video.put()
         self.redirect('/' + str(video.key().id()))
