@@ -9,6 +9,7 @@ import urlparse
 from google.appengine.ext import db
 
 import tornado.web
+import tornado.escape
 from django.utils import simplejson as json
 
 import models
@@ -23,13 +24,6 @@ class BaseHandler(tornado.web.RequestHandler):
         self.get(*args, **kwargs)
         self.request.body = ''
     
-    def render_string(self, template_name, **kwargs):
-        return super(BaseHandler, self).render_string(
-            template_name,
-            truncate=self.truncate,
-            relative_date=self.relative_date,
-            **kwargs)
-        
     def reload(self, copyargs=False, **kwargs):
         data = {}
         if copyargs:
@@ -46,36 +40,6 @@ class BaseHandler(tornado.web.RequestHandler):
         return super(BaseHandler, self).get_error_html(status_code, **kwargs)
         
     ### Template helpers ###
-    @staticmethod
-    def truncate(string, n_chars):
-        new_str = string[0:n_chars]
-        if len(new_str) < len(string):
-            new_str += '...'
-        return cgi.escape(new_str)
-        
-    @staticmethod
-    def markdown(value, video_embed=False):
-        # real line breaks
-        value = re.sub(r'(\S ?)(\r\n|\r|\n)', r'\1  \n', value)
-        # vimeo and youtube embed
-        value = re.sub(r'(?:^|\s)http://(?:www\.)?vimeo\.com/(\d+)', r'VIMEO:\1', value)
-        value = re.sub(r'(?:^|\s)http://www\.youtube\.com/watch\?\S*v=([^&\s]+)\S*', r'YOUTUBE:\1', value)
-        # automatic hyperlinks
-        value = re.sub(r'(^|\s)(http:\/\/\S+)', r'[\2](\2)', value)
-        html = markdown2.markdown(value, safe_mode='escape')
-        if video_embed:
-            html = re.sub(r'VIMEO:(\d+)', 
-                r'<iframe src="http://player.vimeo.com/video/\1" class="video" frameborder="0"></iframe>', html)
-            html = re.sub(r'YOUTUBE:([\w|-]+)', 
-                r'<iframe src="http://www.youtube.com/embed/\1?hd=1" class="video" frameborder="0"></iframe>', html)
-        else:
-            html = re.sub(r'VIMEO:(\d+)', 
-                r'<a href="http://vimeo.com/\1" data-embed="http://player.vimeo.com/video/\1" class="video">http://vimeo.com/\1</a>', html)
-            html = re.sub(r'YOUTUBE:([\w|-]+)', 
-                r'<a href="http://www.youtube.com/watch?v=\1" data-embed="http://www.youtube.com/embed/\1?hd=1" class="video">http://www.youtube.com/watch?v=\1</a>', html)
-        html = html.replace('<a href=', '<a rel="nofollow" href=')
-        return html
-        
     @staticmethod
     def relative_date(date):
         td = datetime.datetime.now() - date
@@ -167,6 +131,15 @@ class Video(BaseHandler):
             raise tornado.web.HTTPError(404)
         next_vid = models.Video.all().filter('score <', video.score).order('-score').get()
         self.render('video.html', video=video, next_vid=next_vid)
+        
+    @staticmethod
+    def htmlify(text):
+        text = tornado.escape.xhtml_escape(text)
+        text = re.sub(r'(\r\n|\r|\n)', r'<br>', text)
+        truncated = text[0:1000]
+        if len(truncated) < len(text):
+            truncated += '...'
+        return truncated
         
     def post(self, id):
         video = models.Video.get_by_id(int(id))

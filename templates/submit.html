@@ -27,7 +27,7 @@
                 .bind('paste blur keyup', function(){
                     var youtube = youtube_re.exec(this.value);
                     var vimeo = vimeo_re.exec(this.value);
-            
+                    
                     if (youtube){
                         var url = 'http://gdata.youtube.com/feeds/api/videos/' + youtube[1] + '?v=2&alt=jsonc&callback=?';
                         $.getJSON(url, function(data){
@@ -41,7 +41,7 @@
                         $.getJSON(url, function(data){
                             data = data[0];
                             var title = data.title;
-                            var text = data.description;
+                            var text = data.description.replace(/<br\s?\/>/g, '');
                             $('#title').val(title);
                             $('#text').val(text);
                         });
