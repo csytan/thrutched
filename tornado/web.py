@@ -23,7 +23,6 @@ Tornado non-blocking web server and tools.
 
 Here is the canonical "Hello, world" example app:
 
-    import tornado.httpserver
     import tornado.ioloop
     import tornado.web
 
@@ -35,12 +34,19 @@ Here is the canonical "Hello, world" example app:
         application = tornado.web.Application([
             (r"/", MainHandler),
         ])
-        http_server = tornado.httpserver.HTTPServer(application)
-        http_server.listen(8888)
+        application.listen(8888)
         tornado.ioloop.IOLoop.instance().start()
 
-See the Tornado walkthrough on GitHub for more details and a good
-getting started guide.
+See the Tornado walkthrough on http://tornadoweb.org for more details
+and a good getting started guide.
+
+Thread-safety notes:
+
+In general, methods on RequestHandler and elsewhere in tornado are not
+thread-safe.  In particular, methods such as write(), finish(), and
+flush() must only be called from the main thread.  If you use multiple
+threads it is important to use IOLoop.add_callback to transfer control
+back to the main thread before finishing the request.
 """
 
 from __future__ import with_statement
@@ -159,12 +165,6 @@ class RequestHandler(object):
         You may override this to clean up resources associated with
         long-lived connections.
 
-        Note that the select()-based implementation of IOLoop does not detect
-        closed connections and so this method will not be called until
-        you try (and fail) to produce some output.  The epoll- and kqueue-
-        based implementations should detect closed connections even while
-        the request is idle.
-
         Proxies may keep a connection open for a time (perhaps
         indefinitely) after the client has gone away, so this method
         may not be called promptly after the end user closes their
@@ -188,6 +188,10 @@ class RequestHandler(object):
         """Sets the status code for our response."""
         assert status_code in httplib.responses
         self._status_code = status_code
+
+    def get_status(self):
+        """Returns the status code for our response."""
+        return self._status_code
 
     def set_header(self, name, value):
         """Sets the given response header name and value.
@@ -216,7 +220,7 @@ class RequestHandler(object):
         """Returns the value of the argument with the given name.
 
         If default is not provided, the argument is considered to be
-        required, and we throw an HTTP 404 exception if it is missing.
+        required, and we throw an HTTP 400 exception if it is missing.
 
         If the argument appears in the url more than once, we return the
         last value.
@@ -226,7 +230,7 @@ class RequestHandler(object):
         args = self.get_arguments(name, strip=strip)
         if not args:
             if default is self._ARG_DEFAULT:
-                raise HTTPError(404, "Missing argument %s" % name)
+                raise HTTPError(400, "Missing argument %s" % name)
             return default
         return args[-1]
 
@@ -317,11 +321,21 @@ class RequestHandler(object):
 
         To read a cookie set with this method, use get_secure_cookie().
         """
+        self.set_cookie(name, self.create_signed_value(name, value),
+                        expires_days=expires_days, **kwargs)
+
+    def create_signed_value(self, name, value):
+        """Signs and timestamps a string so it cannot be forged.
+
+        Normally used via set_secure_cookie, but provided as a separate
+        method for non-cookie uses.  To decode a value not stored
+        as a cookie use the optional value argument to get_secure_cookie.
+        """
         timestamp = str(int(time.time()))
         value = base64.b64encode(value)
         signature = self._cookie_signature(name, value, timestamp)
         value = "|".join([value, timestamp, signature])
-        self.set_cookie(name, value, expires_days=expires_days, **kwargs)
+        return value
 
     def get_secure_cookie(self, name, include_name=True, value=None):
         """Returns the given signed cookie if it validates, or None.
@@ -432,12 +446,14 @@ class RequestHandler(object):
             if head_part: html_heads.append(_utf8(head_part))
             body_part = module.html_body()
             if body_part: html_bodies.append(_utf8(body_part))
+        def is_absolute(path):
+            return any(path.startswith(x) for x in ["/", "http:", "https:"])
         if js_files:
             # Maintain order of JavaScript files given by modules
             paths = []
             unique_paths = set()
             for path in js_files:
-                if not path.startswith("/") and not path.startswith("http:"):
+                if not is_absolute(path):
                     path = self.static_url(path)
                 if path not in unique_paths:
                     paths.append(path)
@@ -453,12 +469,14 @@ class RequestHandler(object):
             sloc = html.rindex('</body>')
             html = html[:sloc] + js + '\n' + html[sloc:]
         if css_files:
-            paths = set()
+            paths = []
+            unique_paths = set()
             for path in css_files:
-                if not path.startswith("/") and not path.startswith("http:"):
-                    paths.add(self.static_url(path))
-                else:
-                    paths.add(path)
+                if not is_absolute(path):
+                    path = self.static_url(path)
+                if path not in unique_paths:
+                    paths.append(path)
+                    unique_paths.add(path)
             css = ''.join('<link href="' + escape.xhtml_escape(p) + '" '
                           'type="text/css" rel="stylesheet"/>'
                           for p in paths)
@@ -546,7 +564,8 @@ class RequestHandler(object):
         # Automatically support ETags and add the Content-Length header if
         # we have not flushed any content yet.
         if not self._headers_written:
-            if (self._status_code == 200 and self.request.method == "GET" and
+            if (self._status_code == 200 and
+                self.request.method in ("GET", "HEAD") and
                 "Etag" not in self._headers):
                 hasher = hashlib.sha1()
                 for part in self._write_buffer:
@@ -595,6 +614,11 @@ class RequestHandler(object):
     def get_error_html(self, status_code, **kwargs):
         """Override to implement custom error pages.
 
+        get_error_html() should return a string containing the error page,
+        and should not produce output via self.write().  If you use a
+        Tornado template for the error page, you must use
+        "return self.render_string(...)" instead of "self.render()".
+
         If this error was caused by an uncaught exception, the
         exception object can be found in kwargs e.g. kwargs['exception']
         """
@@ -623,7 +647,10 @@ class RequestHandler(object):
     def get_user_locale(self):
         """Override to determine the locale from the authenticated user.
 
-        If None is returned, we use the Accept-Language header.
+        If None is returned, we fall back to get_browser_locale().
+
+        This method should return a tornado.locale.Locale object,
+        most likely obtained via a call like tornado.locale.get("en")
         """
         return None
 
@@ -709,16 +736,27 @@ class RequestHandler(object):
     def check_xsrf_cookie(self):
         """Verifies that the '_xsrf' cookie matches the '_xsrf' argument.
 
-        To prevent cross-site request forgery, we set an '_xsrf' cookie
-        and include the same '_xsrf' value as an argument with all POST
-        requests. If the two do not match, we reject the form submission
-        as a potential forgery.
+        To prevent cross-site request forgery, we set an '_xsrf'
+        cookie and include the same value as a non-cookie
+        field with all POST requests. If the two do not match, we
+        reject the form submission as a potential forgery.
+
+        The _xsrf value may be set as either a form field named _xsrf
+        or in a custom HTTP header named X-XSRFToken or X-CSRFToken
+        (the latter is accepted for compatibility with Django).
 
         See http://en.wikipedia.org/wiki/Cross-site_request_forgery
+
+        Prior to release 1.1.1, this check was ignored if the HTTP header
+        "X-Requested-With: XMLHTTPRequest" was present.  This exception
+        has been shown to be insecure and has been removed.  For more
+        information please see
+        http://www.djangoproject.com/weblog/2011/feb/08/security/
+        http://weblog.rubyonrails.org/2011/2/8/csrf-protection-bypass-in-ruby-on-rails
         """
-        if self.request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return
-        token = self.get_argument("_xsrf", None)
+        token = (self.get_argument("_xsrf", None) or
+                 self.request.headers.get("X-Xsrftoken") or
+                 self.request.headers.get("X-Csrftoken"))
         if not token:
             raise HTTPError(403, "'_xsrf' argument missing from POST")
         if self.xsrf_token != token:
@@ -758,27 +796,28 @@ class RequestHandler(object):
         if not hasattr(RequestHandler, "_static_hashes"):
             RequestHandler._static_hashes = {}
         hashes = RequestHandler._static_hashes
-        if path not in hashes:
+        abs_path = os.path.join(self.application.settings["static_path"],
+                                path)
+        if abs_path not in hashes:
             try:
-                f = open(os.path.join(
-                    self.application.settings["static_path"], path))
-                hashes[path] = hashlib.md5(f.read()).hexdigest()
+                f = open(abs_path)
+                hashes[abs_path] = hashlib.md5(f.read()).hexdigest()
                 f.close()
             except:
                 logging.error("Could not open static file %r", path)
-                hashes[path] = None
+                hashes[abs_path] = None
         base = self.request.protocol + "://" + self.request.host \
             if getattr(self, "include_host", False) else ""
         static_url_prefix = self.settings.get('static_url_prefix', '/static/')
-        if hashes.get(path):
-            return base + static_url_prefix + path + "?v=" + hashes[path][:5]
+        if hashes.get(abs_path):
+            return base + static_url_prefix + path + "?v=" + hashes[abs_path][:5]
         else:
             return base + static_url_prefix + path
 
     def async_callback(self, callback, *args, **kwargs):
-        """Wrap callbacks with this if they are used on asynchronous requests.
+        """Obsolete - catches exceptions from the wrapped function.
 
-        Catches exceptions and properly finishes the request.
+        This function is unnecessary since Tornado 1.1.
         """
         if callback is None:
             return None
@@ -804,22 +843,27 @@ class RequestHandler(object):
     def reverse_url(self, name, *args):
         return self.application.reverse_url(name, *args)
 
-    @contextlib.contextmanager
-    def _stack_context(self):
+    def _stack_context_handle_exception(self, type, value, traceback):
         try:
-            yield
-        except Exception, e:
-            self._handle_request_exception(e)
+            # For historical reasons _handle_request_exception only takes
+            # the exception value instead of the full triple,
+            # so re-raise the exception to ensure that it's in
+            # sys.exc_info()
+            raise type, value, traceback
+        except:
+            self._handle_request_exception(value)
+        return True
 
     def _execute(self, transforms, *args, **kwargs):
         """Executes this request with the given output transforms."""
         self._transforms = transforms
-        with stack_context.StackContext(self._stack_context):
+        with stack_context.ExceptionStackContext(
+            self._stack_context_handle_exception):
             if self.request.method not in self.SUPPORTED_METHODS:
                 raise HTTPError(405)
             # If XSRF cookies are turned on, reject form submissions without
             # the proper cookie
-            if self.request.method == "POST" and \
+            if self.request.method not in ("GET", "HEAD", "OPTIONS") and \
                self.application.settings.get("xsrf_cookies"):
                 self.check_xsrf_cookie()
             self.prepare()
@@ -838,15 +882,13 @@ class RequestHandler(object):
         return "\r\n".join(lines) + "\r\n\r\n"
 
     def _log(self):
-        if self._status_code < 400:
-            log_method = logging.info
-        elif self._status_code < 500:
-            log_method = logging.warning
-        else:
-            log_method = logging.error
-        request_time = 1000.0 * self.request.request_time()
-        log_method("%d %s %.2fms", self._status_code,
-                   self._request_summary(), request_time)
+        """Logs the current request.
+
+        Sort of deprecated since this functionality was moved to the
+        Application, but left in place for the benefit of existing apps
+        that have overridden this method.
+        """
+        self.application.log_request(self)
 
     def _request_summary(self):
         return self.request.method + " " + self.request.uri + " (" + \
@@ -865,7 +907,7 @@ class RequestHandler(object):
                 self.send_error(e.status_code, exception=e)
         else:
             logging.error("Uncaught exception %s\n%r", self._request_summary(),
-                          self.request, exc_info=e)
+                          self.request, exc_info=True)
             self.send_error(500, exception=e)
 
     def _ui_module(self, name, module):
@@ -920,12 +962,14 @@ def removeslash(method):
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
         if self.request.path.endswith("/"):
-            if self.request.method == "GET":
+            if self.request.method in ("GET", "HEAD"):
                 uri = self.request.path.rstrip("/")
-                if self.request.query: uri += "?" + self.request.query
-                self.redirect(uri)
-                return
-            raise HTTPError(404)
+                if uri:  # don't try to redirect '/' to ''
+                    if self.request.query: uri += "?" + self.request.query
+                    self.redirect(uri)
+                    return
+            else:
+                raise HTTPError(404)
         return method(self, *args, **kwargs)
     return wrapper
 
@@ -940,7 +984,7 @@ def addslash(method):
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
         if not self.request.path.endswith("/"):
-            if self.request.method == "GET":
+            if self.request.method in ("GET", "HEAD"):
                 uri = self.request.path + "/"
                 if self.request.query: uri += "?" + self.request.query
                 self.redirect(uri)
@@ -1024,6 +1068,25 @@ class Application(object):
         if self.settings.get("debug") and not wsgi:
             import autoreload
             autoreload.start()
+
+    def listen(self, port, address="", **kwargs):
+        """Starts an HTTP server for this application on the given port.
+
+        This is a convenience alias for creating an HTTPServer object
+        and calling its listen method.  Keyword arguments not
+        supported by HTTPServer.listen are passed to the HTTPServer
+        constructor.  For advanced uses (e.g. preforking), do not use
+        this method; create an HTTPServer and call its bind/start
+        methods directly.
+
+        Note that after calling this method you still need to call
+        IOLoop.instance().start() to start the server.
+        """
+        # import is here rather than top level because HTTPServer
+        # is not importable on appengine
+        from tornado.httpserver import HTTPServer
+        server = HTTPServer(self, **kwargs)
+        server.listen(port, address)
 
     def add_handlers(self, host_pattern, host_handlers):
         """Appends the given handlers to our handler list.
@@ -1116,7 +1179,7 @@ class Application(object):
         handlers = self._get_host_handlers(request)
         if not handlers:
             handler = RedirectHandler(
-                request, "http://" + self.default_host + "/")
+                self, request, url="http://" + self.default_host + "/")
         else:
             for spec in handlers:
                 match = spec.regex.match(request.path)
@@ -1138,14 +1201,14 @@ class Application(object):
                         args = [unquote(s) for s in match.groups()]
                     break
             if not handler:
-                handler = ErrorHandler(self, request, 404)
+                handler = ErrorHandler(self, request, status_code=404)
 
         # In debug mode, re-compile templates and reload static files on every
         # request so you don't need to restart to see changes
         if self.settings.get("debug"):
             if getattr(RequestHandler, "_templates", None):
-                map(lambda loader: loader.reset(),
-                    RequestHandler._templates.values())
+                for loader in RequestHandler._templates.values():
+                    loader.reset()
             RequestHandler._static_hashes = {}
 
         handler._execute(transforms, *args, **kwargs)
@@ -1159,6 +1222,28 @@ class Application(object):
         if name in self.named_handlers:
             return self.named_handlers[name].reverse(*args)
         raise KeyError("%s not found in named urls" % name)
+
+    def log_request(self, handler):
+        """Writes a completed HTTP request to the logs.
+
+        By default writes to the python root logger.  To change
+        this behavior either subclass Application and override this method,
+        or pass a function in the application settings dictionary as
+        'log_function'.
+        """
+        if "log_function" in self.settings:
+            self.settings["log_function"](handler)
+            return
+        if handler.get_status() < 400:
+            log_method = logging.info
+        elif handler.get_status() < 500:
+            log_method = logging.warning
+        else:
+            log_method = logging.error
+        request_time = 1000.0 * handler.request.request_time()
+        log_method("%d %s %.2fms", handler.get_status(),
+                   handler._request_summary(), request_time)
+
 
 
 class HTTPError(Exception):
@@ -1179,8 +1264,7 @@ class HTTPError(Exception):
 
 class ErrorHandler(RequestHandler):
     """Generates an error response with status_code for all requests."""
-    def __init__(self, application, request, status_code):
-        RequestHandler.__init__(self, application, request)
+    def initialize(self, status_code):
         self.set_status(status_code)
 
     def prepare(self):
@@ -1196,8 +1280,7 @@ class RedirectHandler(RequestHandler):
             (r"/oldpath", web.RedirectHandler, {"url": "/newpath"}),
         ])
     """
-    def __init__(self, application, request, url, permanent=True):
-        RequestHandler.__init__(self, application, request)
+    def initialize(self, url, permanent=True):
         self._url = url
         self._permanent = permanent
 
@@ -1223,17 +1306,29 @@ class StaticFileHandler(RequestHandler):
     want browsers to cache a file indefinitely, send them to, e.g.,
     /static/images/myimage.png?v=xxx.
     """
-    def __init__(self, application, request, path):
-        RequestHandler.__init__(self, application, request)
+    def initialize(self, path, default_filename=None):
         self.root = os.path.abspath(path) + os.path.sep
+        self.default_filename = default_filename
 
     def head(self, path):
         self.get(path, include_body=False)
 
     def get(self, path, include_body=True):
+        if os.path.sep != "/":
+            path = path.replace("/", os.path.sep)
         abspath = os.path.abspath(os.path.join(self.root, path))
-        if not abspath.startswith(self.root):
+        # os.path.abspath strips a trailing /
+        # it needs to be temporarily added back for requests to root/
+        if not (abspath + os.path.sep).startswith(self.root):
             raise HTTPError(403, "%s is not in root static directory", path)
+        if os.path.isdir(abspath) and self.default_filename is not None:
+            # need to look at the request.path here for when path is empty
+            # but there is some prefix to the path that was already
+            # trimmed by the routing
+            if not self.request.path.endswith("/"):
+                self.redirect(self.request.path + "/")
+                return
+            abspath = os.path.join(abspath, self.default_filename)
         if not os.path.exists(abspath):
             raise HTTPError(404)
         if not os.path.isfile(abspath):
@@ -1267,7 +1362,6 @@ class StaticFileHandler(RequestHandler):
 
         if not include_body:
             return
-        self.set_header("Content-Length", stat_result[stat.ST_SIZE])
         file = open(abspath, "rb")
         try:
             self.write(file.read())
@@ -1293,8 +1387,7 @@ class FallbackHandler(RequestHandler):
             (r".*", FallbackHandler, dict(fallback=wsgi_app),
         ])
     """
-    def __init__(self, app, request, fallback):
-        RequestHandler.__init__(self, app, request)
+    def initialize(self, fallback):
         self.fallback = fallback
 
     def prepare(self):
@@ -1399,7 +1492,7 @@ def authenticated(method):
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
         if not self.current_user:
-            if self.request.method == "GET":
+            if self.request.method in ("GET", "HEAD"):
                 url = self.get_login_url()
                 if "?" not in url:
                     if urlparse.urlsplit(url).scheme:

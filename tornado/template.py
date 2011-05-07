@@ -53,7 +53,7 @@ interesting. Syntax for the templates
 
     {% block student %}
       <li><span style="bold">{{ escape(student.name) }}</span></li>
-    {% block %}
+    {% end %}
 
 Unlike most other template systems, we do not put any restrictions on the
 expressions you can include in your statements. if and for blocks get
@@ -101,7 +101,7 @@ class Template(object):
         if compress_whitespace is None:
             compress_whitespace = name.endswith(".html") or \
                 name.endswith(".js")
-        reader = _TemplateReader(name, template_string)
+        reader = _TemplateReader(name, escape.utf8(template_string))
         self.file = _File(_parse(reader))
         self.code = self._generate_python(loader, compress_whitespace)
         try:
@@ -115,9 +115,11 @@ class Template(object):
         """Generate this template with the given arguments."""
         namespace = {
             "escape": escape.xhtml_escape,
+            "xhtml_escape": escape.xhtml_escape,
             "url_escape": escape.url_escape,
             "json_encode": escape.json_encode,
             "squeeze": escape.squeeze,
+            "linkify": escape.linkify,
             "datetime": datetime,
         }
         namespace.update(kwargs)
@@ -531,7 +533,8 @@ def _parse(reader, in_block=None):
                 raise ParseError("Extra {%% end %%} block on line %d" % line)
             return body
 
-        elif operator in ("extends", "include", "set", "import", "comment"):
+        elif operator in ("extends", "include", "set", "import", "from",
+                          "comment"):
             if operator == "comment":
                 continue
             if operator == "extends":
@@ -539,7 +542,7 @@ def _parse(reader, in_block=None):
                 if not suffix:
                     raise ParseError("extends missing file path on line %d" % line)
                 block = _ExtendsBlock(suffix)
-            elif operator == "import":
+            elif operator in ("import", "from"):
                 if not suffix:
                     raise ParseError("import missing statement on line %d" % line)
                 block = _Statement(contents)
