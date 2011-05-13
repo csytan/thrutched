@@ -93,6 +93,7 @@ class Submit(BaseHandler):
             try:
                 data = json.loads(response)
             except ValueError:
+                logging.error(response)
                 return self.reload(message='not_found', copyargs=True)
             thumbnail = data['entry']['media$group']['media$thumbnail'][1]['url']
         elif vimeo:
@@ -104,7 +105,6 @@ class Submit(BaseHandler):
             thumbnail = data[0]['thumbnail_large']
         else:
             return self.reload(message='not_found', copyargs=True)
-        
         
         if youtube:
             dupe = models.Video.all().filter('youtube =', youtube).get()
