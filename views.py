@@ -88,7 +88,7 @@ class Submit(BaseHandler):
         youtube = youtube[0] if youtube else None
         vimeo = vimeo[0] if vimeo else None
         if youtube:
-            api = 'http://gdata.youtube.com/feeds/api/videos/' + youtube + '?v=2&alt=json'
+            api = 'http://gdata.youtube.com/feeds/api/videos/' + youtube + '?v=2&alt=json&key=AI39si5nwWTo74H9slMDgT-fO_PkbBGIKzEMwJ53iWOUUKaHFmphCjXDoYFyagU5W15Q7ZB7wRpON-fHNLdMnGOWsiz18_kQig'
             response = urllib.urlopen(api).read()
             try:
                 data = json.loads(response)
