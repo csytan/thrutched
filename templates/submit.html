@@ -69,7 +69,7 @@
     <h1>Submit a Video</h1>
     
     <form action="/submit" method="post">
-        {{ xsrf_form_html() }}
+        {% raw xsrf_form_html() %}
         <label for="url">Url (YouTube or Vimeo)</label>
         <input id="url" type="text" name="url" value="{{ handler.get_argument('url', '') }}" tabindex="1">
         <label for="title">Title</label>

@@ -1,6 +1,8 @@
 import os
-import wsgiref.handlers
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
 
+from google.appengine.ext import ndb
 import tornado.wsgi
 
 import views
@@ -13,17 +15,12 @@ settings = {
     'cookie_secret': 'bob',
     'xsrf_cookies': True,
 }
-application = tornado.wsgi.WSGIApplication([
+app = tornado.wsgi.WSGIApplication([
     (r'/', views.Index),
     (r'/submit', views.Submit),
+    (r'/admin', views.Admin),
+    (r'/cron', views.Cron),
     (r'/(\d+)', views.Video)
 ], **settings)
 
-
-def main():
-    wsgiref.handlers.CGIHandler().run(application)
-
-
-if __name__ == "__main__":
-    main()
-    
+app = ndb.toplevel(app)

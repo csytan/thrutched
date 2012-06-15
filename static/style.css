@@ -67,6 +67,7 @@ textarea {
     padding: 0.4em;
     display: block;
     margin-bottom: 0.5em;
+    width: 300px;
 }
 
 
@@ -121,9 +122,10 @@ a.vid_thumb .title {
 }
 .vid_thumb img {
     position: absolute;
+    display: block;
     top: -60px;
     left: -80px;
-    display: block;
+    min-width: 400px;
 }
 .vid_thumb:hover {
     opacity: 0.9;

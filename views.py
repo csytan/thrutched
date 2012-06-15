@@ -1,22 +1,27 @@
 import cgi
 import datetime
+import json
 import logging
 import os
 import re
 import urllib
 import urlparse
 
-from google.appengine.ext import db
+from google.appengine.ext import ndb
 
+import feedparser
+import bs4
 import tornado.web
 import tornado.escape
-from django.utils import simplejson as json
 
 import models
 
 
 
 DEBUG = os.environ['SERVER_SOFTWARE'].startswith('Dev')
+_YOUTUBE_RE = re.compile(r'youtube\.com\/watch\?\S*v=([^&\s]+)')
+_VIMEO_RE = re.compile(r'vimeo\.com\/(\d+)')
+
 
 
 class BaseHandler(tornado.web.RequestHandler):
@@ -32,12 +37,6 @@ class BaseHandler(tornado.web.RequestHandler):
                     data[arg] = self.get_argument(arg)
         data.update(kwargs)
         self.redirect(self.request.path + '?' + urllib.urlencode(data))
-        
-    def get_error_html(self, status_code, **kwargs):
-        if status_code in (404, 500): # 503 and 403
-            pass
-            #return self.render_string(str(status_code) + '.html')
-        return super(BaseHandler, self).get_error_html(status_code, **kwargs)
         
     ### Template helpers ###
     @staticmethod
@@ -63,9 +62,58 @@ class Index(BaseHandler):
     def get(self):
         page = self.get_argument('page', '')
         page = abs(int(page)) if page.isdigit() else 0
-        videos = models.Video.all().order('-score').fetch(9, offset=page*9)
+        videos = models.Video.query().fetch(9, offset=page*9)
         next_page = page + 1 if len(videos) == 9 else None
         self.render('index.html', videos=videos, next_page=next_page)
+
+
+class Admin(BaseHandler):
+    def get(self):
+        self.render('admin.html', feeds=models.Feed.query().fetch(100))
+
+    def post(self):
+        feed_id = self.get_argument('id', None)
+        feed_url = self.get_argument('feed_url', None)
+        page_url = self.get_argument('page_url', None)
+
+        if feed_id:
+            feed = models.Feed.get_by_id(int(feed_id))
+        else:
+            feed = models.Feed()
+
+        action = self.get_argument('action', None)
+        if action == 'remove':
+            feed.key.delete()
+            return self.redirect('/admin?removed=1')
+
+        if page_url:
+            page = urllib.urlopen(page_url).read()
+            soup = bs4.BeautifulSoup(page)
+            rss = soup.find('link', type='application/rss+xml')
+            feed_url = rss.get('href', None)
+
+        feed.name = self.get_argument('name', None)
+        feed.find_words = [w.strip() for w in self.get_argument('find_words', '').split(',') if w.strip()]
+        feed.url = feed_url
+        feed.put()
+        self.redirect('/admin')
+
+
+class Cron(BaseHandler):
+    def get(self):
+        feeds = models.Feed.query().fetch(100)
+        for feed in feeds:
+            rss = feedparser.parse(feed.url)
+            for entry in rss.entries:
+                text = entry.link + ' ' + entry.description
+                youtube = _YOUTUBE_RE.findall(text)
+                vimeo = _VIMEO_RE.findall(text)
+                if youtube:
+                    models.Video.add_youtube(youtube[0])
+                elif vimeo:
+                    models.Video.add_vimeo(vimeo[0])
+        self.write('1')
+
 
 
 class Submit(BaseHandler):
@@ -129,8 +177,7 @@ class Video(BaseHandler):
         video = models.Video.get_by_id(int(id))
         if not video:
             raise tornado.web.HTTPError(404)
-        next_vid = models.Video.all().filter('score <', video.score).order('-score').get()
-        self.render('video.html', video=video, next_vid=next_vid)
+        self.render('video.html', video=video, next_vid=video.next_vid())
         
     @staticmethod
     def htmlify(text):

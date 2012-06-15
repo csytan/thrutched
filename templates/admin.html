@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+
+{% block title %}
+    <title>Thrutched | Admin</title>
+{% end %}
+
+
+{% block style %}
+    <style>
+        #edit_feed, #feeds {
+            float: left;
+            width: 400px;
+        }
+        #edit_feed .remove {
+            display: none;
+        }
+    </style>
+{% end %}
+
+
+{% block script %}
+    <script>
+        $(function(){
+            $('a.edit').click(function(){
+                $.each($(this).data(), function(key, val){
+                    $('#edit_feed').find('input[name="' + key + '"]')
+                        .val(val);
+                });
+                $('#edit_feed .remove').show();
+                return false;
+            });
+
+            $('#edit_feed .remove').click(function(){
+                if (confirm('Are you sure you want to remove this feed?')){
+                    $('#edit_feed input[name="action"]').val('remove');
+                } else {
+                    return false;
+                }
+            });
+        });
+    </script>
+{% end %}
+
+
+{% block content %}
+    <h1>Feeds</h1>
+
+    <form id="edit_feed" action="" method="post">
+        {% raw xsrf_form_html() %}
+        <input type="hidden" name="id">
+        <input type="hidden" name="action" value="edit">
+        <label>Name</label>
+        <input type="text" name="name">
+        <label>Page URL</label>
+        <input type="text" name="page_url">
+        <label>Feed URL</label>
+        <input type="text" name="feed_url">
+        <label>Find Words</label>
+        <input type="text" name="find_words">
+        <input type="submit" value="Add a feed">
+        <input type="submit" class="remove" value="Remove">
+    </form>
+    
+    <table id="feeds">
+        {% for feed in feeds %}
+            <tr>
+                <td>{{ feed.name }}</td>
+                <td>
+                    <a class="edit"
+                        data-name="{{ feed.name }}"
+                        data-id="{{ feed.key.id() }}"
+                        data-feed_url="{{ feed.url }}"
+                        data-find_words="{{ ', '.join(feed.find_words) }}">
+                        Edit
+                    </a>
+                </td>
+            </tr>
+        {% end %}
+    </table>
+{% end %}
