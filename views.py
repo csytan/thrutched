@@ -62,7 +62,7 @@ class Index(BaseHandler):
     def get(self):
         page = self.get_argument('page', '')
         page = abs(int(page)) if page.isdigit() else 0
-        videos = models.Video.query().fetch(9, offset=page*9)
+        videos = models.Video.hottest(page)
         next_page = page + 1 if len(videos) == 9 else None
         self.render('index.html', videos=videos, next_page=next_page)
 
@@ -101,17 +101,8 @@ class Admin(BaseHandler):
 
 class Cron(BaseHandler):
     def get(self):
-        feeds = models.Feed.query().fetch(100)
-        for feed in feeds:
-            rss = feedparser.parse(feed.url)
-            for entry in rss.entries:
-                text = entry.link + ' ' + entry.description
-                youtube = _YOUTUBE_RE.findall(text)
-                vimeo = _VIMEO_RE.findall(text)
-                if youtube:
-                    models.Video.add_youtube(youtube[0])
-                elif vimeo:
-                    models.Video.add_vimeo(vimeo[0])
+        for feed in models.Feed.query().fetch(100):
+            feed.fetch_vids()
         self.write('1')
 
 

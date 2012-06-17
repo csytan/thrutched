@@ -12,6 +12,7 @@ import uuid
 from google.appengine.ext import ndb
 
 import feedparser
+import bs4
 
 
 ### Models ###
@@ -43,6 +44,10 @@ class Video(Votable):
     text = ndb.TextProperty(default='')
 
     @classmethod
+    def hottest(cls, page=0):
+        return cls.query().order(-Video.created).fetch(9, offset=page*9)
+
+    @classmethod
     def add_youtube(cls, id):
         video = cls.query(cls.youtube == id).get()
         if video: return video
@@ -52,7 +57,7 @@ class Video(Votable):
         try:
             data = json.loads(response)
         except ValueError:
-            logging.error(response)
+            logging.error(id + '\n' + response)
             return
 
         video = cls(
@@ -83,7 +88,11 @@ class Video(Votable):
         video.put()
 
     def next_vid(self):
-        return Video.query(Video.created > self.created).order(-Video.created).get()
+        return Video.query(Video.created < self.created).order(-Video.created).get()
+
+
+_YOUTUBE_RE = re.compile(r'youtube\.com\/watch\?\S*v=([^&\s]{11})')
+_VIMEO_RE = re.compile(r'vimeo\.com\/(\d+)')
 
 
 class Feed(ndb.Model):
@@ -94,12 +103,23 @@ class Feed(ndb.Model):
 
     def fetch_vids(self):
         rss = feedparser.parse(self.url)
+        entries = rss.entries or rss.channel
         for entry in rss.entries:
-            text = entry.link + ' ' + entry.description
+            text = entry.link + ' ' + entry.title + ' ' + entry.description
+            #text = bs4.BeautifulSoup(text).text
+            text_lowered = text.lower()
+
+            if self.find_words:
+                for word in self.find_words:
+                    if word in text:
+                        break
+                else:
+                    continue
+            #logging.error(text)
             youtube = _YOUTUBE_RE.findall(text)
             vimeo = _VIMEO_RE.findall(text)
             if youtube:
-                models.Video.add_youtube(youtube[0])
+                Video.add_youtube(youtube[0])
             elif vimeo:
-                models.Video.add_vimeo(vimeo[0])
+                Video.add_vimeo(vimeo[0])
 
