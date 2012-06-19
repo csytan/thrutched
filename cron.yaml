@@ -1,0 +1,3 @@
+cron:
+- url: /cron/update_feeds
+  schedule: every 1 hours synchronized

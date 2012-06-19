@@ -12,7 +12,6 @@ import uuid
 from google.appengine.ext import ndb
 
 import feedparser
-import bs4
 
 
 ### Models ###
@@ -101,12 +100,19 @@ class Feed(ndb.Model):
     url = ndb.StringProperty(indexed=False)
     find_words = ndb.StringProperty(repeated=True, indexed=False)
 
+    @classmethod
+    def update_feeds(cls):
+        yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+        feeds = cls.query(cls.updated < yesterday).fetch(2)
+        for feed in feeds:
+            feed.fetch_vids()
+            feed.put()
+
     def fetch_vids(self):
         rss = feedparser.parse(self.url)
         entries = rss.entries or rss.channel
-        for entry in rss.entries:
+        for entry in rss.entries[:2]:
             text = entry.link + ' ' + entry.title + ' ' + entry.description
-            #text = bs4.BeautifulSoup(text).text
             text_lowered = text.lower()
 
             if self.find_words:
@@ -115,7 +121,6 @@ class Feed(ndb.Model):
                         break
                 else:
                     continue
-            #logging.error(text)
             youtube = _YOUTUBE_RE.findall(text)
             vimeo = _VIMEO_RE.findall(text)
             if youtube:

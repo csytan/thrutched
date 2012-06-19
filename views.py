@@ -100,11 +100,9 @@ class Admin(BaseHandler):
 
 
 class Cron(BaseHandler):
-    def get(self):
-        for feed in models.Feed.query().fetch(100):
-            feed.fetch_vids()
+    def get(self, task):
+        models.Feed.update_feeds()
         self.write('1')
-
 
 
 class Submit(BaseHandler):

@@ -19,7 +19,7 @@ app = tornado.wsgi.WSGIApplication([
     (r'/', views.Index),
     (r'/submit', views.Submit),
     (r'/admin', views.Admin),
-    (r'/cron', views.Cron),
+    (r'/cron/(.+)', views.Cron),
     (r'/(\d+)', views.Video)
 ], **settings)
 
